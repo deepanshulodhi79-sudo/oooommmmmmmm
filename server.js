@@ -10,26 +10,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Root route
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "launcher.html"));
 });
 
-// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Mail Sender Server is running!" });
 });
 
-// Send email route
 app.post("/send", async (req, res) => {
   const { senderEmail, senderPassword, smtpHost, smtpPort, toEmail, subject, message, senderName } = req.body;
 
-  // Validation
   if (!senderEmail || !senderPassword || !toEmail || !subject || !message) {
-    return res.status(400).json({
-      success: false,
-      error: "Zaroori fields khaali hain: senderEmail, senderPassword, toEmail, subject, message",
-    });
+    return res.status(400).json({ success: false, error: "Zaroori fields khaali hain." });
   }
 
   try {
@@ -37,40 +30,35 @@ app.post("/send", async (req, res) => {
       host: smtpHost || "smtp.gmail.com",
       port: parseInt(smtpPort) || 587,
       secure: parseInt(smtpPort) === 465,
-      auth: {
-        user: senderEmail,
-        pass: senderPassword,
-      },
-      tls: {
-        rejectUnauthorized: false,
-      },
+      auth: { user: senderEmail, pass: senderPassword },
+      tls: { rejectUnauthorized: false },
     });
 
-    const mailOptions = {
+    const info = await transporter.sendMail({
       from: senderName ? `"${senderName}" <${senderEmail}>` : senderEmail,
       to: toEmail,
       subject: subject,
       text: message,
-      html: `<div style="font-family: Arial, sans-serif; line-height: 1.6;">${message.replace(/\n/g, "<br>")}</div>`,
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-
-    res.json({
-      success: true,
-      message: "Email successfully bhej diya gaya! ✅",
-      messageId: info.messageId,
+      html: `
+    <html>
+      <head>
+        <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap" rel="stylesheet">
+      </head>
+      <body style="margin:0;padding:0;">
+        <div style="font-family:'Nunito',Arial,sans-serif;font-size:15px;line-height:1.8;color:#222;max-width:600px;padding:20px;">
+          ${message.replace(/\n/g, "<br>")}
+        </div>
+      </body>
+    </html>
+  `,
     });
+
+    res.json({ success: true, message: "Email successfully bhej diya gaya! ✅", messageId: info.messageId });
   } catch (error) {
-    console.error("Email error:", error.message);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Email bhejne mein kuch problem aayi.",
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Bulk send route
 app.post("/send-bulk", async (req, res) => {
   const { senderEmail, senderPassword, smtpHost, smtpPort, recipients, subject, message, senderName } = req.body;
 
@@ -100,7 +88,7 @@ app.post("/send-bulk", async (req, res) => {
         to: email,
         subject,
         text: message,
-        html: `<div style="font-family: Arial, sans-serif;">${message.replace(/\n/g, "<br>")}</div>`,
+        html: `<div style="font-family:Calibri,sans-serif;font-size:14pt;line-height:1.5;color:#000000;">${message.replace(/\n/g, "<br>")}</div>`,
       });
       results.push({ email, status: "success" });
     } catch (err) {
@@ -109,11 +97,7 @@ app.post("/send-bulk", async (req, res) => {
   }
 
   const successCount = results.filter((r) => r.status === "success").length;
-  res.json({
-    success: true,
-    message: `${successCount}/${emailList.length} emails bheje gaye.`,
-    results,
-  });
+  res.json({ success: true, message: `${successCount}/${emailList.length} emails bheje gaye.`, results });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
